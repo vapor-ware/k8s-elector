@@ -27,7 +27,6 @@ import (
 	"syscall"
 	"time"
 
-	log "github.com/sirupsen/logrus"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -35,6 +34,7 @@ import (
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/transport"
+	"k8s.io/klog"
 )
 
 var (
@@ -50,6 +50,7 @@ var (
 	// bound on program init.
 	id         string
 	kubeconfig string
+	lockType   string
 	name       string
 	namespace  string
 	ttl        time.Duration
@@ -58,6 +59,7 @@ var (
 func init() {
 	flag.StringVar(&id, "id", "", "The ID of the election participant. If not set, the hostname, as reported by the kernel, is used.")
 	flag.StringVar(&kubeconfig, "kubeconfig", "", "The kubeconfig file to use. If not set, in-cluster config will be used.")
+	flag.StringVar(&lockType, "lock-type", resourcelock.LeasesResourceLock, "The type of Kubernetes object to use for the lock (leases, endpoints, configmaps)")
 	flag.StringVar(&name, "election", "", "The name of the election. This is required.")
 	flag.StringVar(&namespace, "namespace", "default", "The Kubernetes namespace to run the election in. If not set, elections will run in the default namespace.")
 	flag.DurationVar(&ttl, "ttl", 10*time.Second, "The TTL for the election.")
@@ -93,14 +95,35 @@ func parseFlags() {
 	if id == "" {
 		hostname, err := os.Hostname()
 		if err != nil {
-			log.Fatal("failed to get hostname for default '-id' value")
+			klog.Fatal("failed to get hostname for default '-id' value")
 		}
 		id = hostname
 	}
 
 	if name == "" {
-		log.Fatal("required flag '-election' was not specified (use '--help' for usage)")
+		klog.Fatal("required flag '-election' was not specified (use '--help' for usage)")
 	}
+}
+
+func logVersion() {
+	klog.Info("k8s-elector")
+	klog.Infof("  version    : %s", Version)
+	klog.Infof("  commit     : %s", Commit)
+	klog.Infof("  tag        : %s", Tag)
+	klog.Infof("  go version : %s", GoVersion)
+	klog.Infof("  build date : %s", BuildDate)
+	klog.Infof("  os         : %s", runtime.GOOS)
+	klog.Infof("  arch       : %s", runtime.GOARCH)
+}
+
+func logFlagConfig() {
+	klog.Info("running with configuration:")
+	klog.Infof("  id         : %s", id)
+	klog.Infof("  kubeconfig : %s", kubeconfig)
+	klog.Infof("  lock type  : %s", lockType)
+	klog.Infof("  name       : %s", name)
+	klog.Infof("  namespace  : %s", namespace)
+	klog.Infof("  ttl        : %s", ttl)
 }
 
 func main() {
@@ -109,43 +132,34 @@ func main() {
 	// is designated as the leader. Conflicting writes are detected and handled
 	// independently by each participant.
 
-	log.WithFields(log.Fields{
-		"version":    Version,
-		"commit":     Commit,
-		"tag":        Tag,
-		"go_version": GoVersion,
-		"build_date": BuildDate,
-		"os":         runtime.GOOS,
-		"arch":       runtime.GOARCH,
-	}).Info("running k8s-elector")
+	logVersion()
 
 	// Parse command line flags to load the program configuration. If required
 	// flags are missing, this will terminate the program.
 	parseFlags()
 
-	log.WithFields(log.Fields{
-		"id":         id,
-		"kubeconfig": kubeconfig,
-		"name":       name,
-		"namespace":  namespace,
-		"ttl":        ttl,
-	}).Info("parsed run configuration")
+	logFlagConfig()
 
 	config, err := buildConfig()
 	if err != nil {
-		log.Fatal(err)
+		klog.Fatal(err)
 	}
 	client := kubernetes.NewForConfigOrDie(config)
 
-	lock := &resourcelock.LeaseLock{
-		LeaseMeta: v1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
-		},
-		Client: client.CoordinationV1(),
-		LockConfig: resourcelock.ResourceLockConfig{
+	// Create the lock object that will be used for the election.
+	lock, err := resourcelock.New(
+		lockType,
+		namespace,
+		name,
+		client.CoreV1(),
+		client.CoordinationV1(),
+		resourcelock.ResourceLockConfig{
 			Identity: id,
+			// todo: create event recorder..
 		},
+	)
+	if err != nil {
+		klog.Fatal(err)
 	}
 
 	// Create a context that will be used to cancel this participants participation
@@ -163,7 +177,7 @@ func main() {
 	signal.Notify(term, os.Interrupt, os.Kill, syscall.SIGTERM)
 	go func() {
 		sig := <-term
-		log.WithField("signal", sig).Info("received termination signal, shutting down")
+		klog.Infof("shutting down: received termination signal %v", sig)
 		cancel()
 	}()
 
@@ -172,22 +186,22 @@ func main() {
 		Lock:            lock,
 		Name:            fmt.Sprintf("%s/%s-%s", namespace, name, id),
 		ReleaseOnCancel: true,
-		LeaseDuration:   60 * time.Second, // fixme: ttl?
-		RenewDeadline:   15 * time.Second,
-		RetryPeriod:     5 * time.Second,
+		LeaseDuration:   ttl,
+		RenewDeadline:   ttl / 3,
+		RetryPeriod:     ttl / 6,
 		Callbacks: leaderelection.LeaderCallbacks{
 			OnStartedLeading: func(i context.Context) {
-				log.WithField("leader", id).Info("this participant is now the leader")
+				klog.Infof("%s: started leading", id)
 			},
 			OnStoppedLeading: func() {
-				log.WithField("leader", id).Info("stepping down as leader")
+				klog.Infof("%s: stepping down as leader", id)
 			},
 			OnNewLeader: func(identity string) {
 				if identity == id {
 					// This participant was elected.
 					return
 				}
-				log.WithField("leader", identity).Info("new leader elected")
+				klog.Infof("%s: new leader elected", identity)
 			},
 		},
 	})
@@ -197,9 +211,9 @@ func main() {
 	// report an error.
 	_, err = client.CoordinationV1().Leases(namespace).Get(name, v1.GetOptions{})
 	if err == nil || !strings.Contains(err.Error(), "is shutting down") {
-		log.Fatalf("%s: expected to get an error when trying to make a client call on shutdown: %v", id, err)
+		klog.Fatalf("%s: expected to get an error when trying to make a client call on shutdown: %v", id, err)
 	}
 
 	// This participant no longer holds the lease.
-	log.Infof("%s: done", id)
+	klog.Infof("%s: done", id)
 }
