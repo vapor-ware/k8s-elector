@@ -18,8 +18,11 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
+	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"runtime"
@@ -48,6 +51,7 @@ var (
 
 	// Variables for command line flag values. The command line flags are
 	// bound on program init.
+	addr       string
 	id         string
 	kubeconfig string
 	lockType   string
@@ -57,6 +61,7 @@ var (
 )
 
 func init() {
+	flag.StringVar(&addr, "http", "", "The HTTP address (host:port) which leader state will be reported on.")
 	flag.StringVar(&id, "id", "", "The ID of the election participant. If not set, the hostname, as reported by the kernel, is used.")
 	flag.StringVar(&kubeconfig, "kubeconfig", "", "The kubeconfig file to use. If not set, in-cluster config will be used.")
 	flag.StringVar(&lockType, "lock-type", resourcelock.LeasesResourceLock, "The type of Kubernetes object to use for the lock (leases, endpoints, configmaps)")
@@ -118,12 +123,38 @@ func logVersion() {
 
 func logFlagConfig() {
 	klog.Info("running with configuration:")
+	klog.Infof("  addr       : %s", addr)
 	klog.Infof("  id         : %s", id)
 	klog.Infof("  kubeconfig : %s", kubeconfig)
 	klog.Infof("  lock type  : %s", lockType)
 	klog.Infof("  name       : %s", name)
 	klog.Infof("  namespace  : %s", namespace)
 	klog.Infof("  ttl        : %s", ttl)
+}
+
+var leaderInfo string
+
+func httpLeaderInfo(res http.ResponseWriter, req *http.Request) {
+	data, err := json.Marshal(map[string]interface{}{
+		"node":      id,
+		"leader":    leaderInfo,
+		"is_leader": id == leaderInfo,
+		"timestamp": time.Now().UTC().Format(time.RFC3339),
+	})
+	if err != nil {
+		res.WriteHeader(http.StatusInternalServerError)
+		if _, e := res.Write([]byte(err.Error())); e != nil {
+			klog.Error("failed writing http error response (%v): %v", err, e)
+		}
+		return
+	}
+
+	res.Header()["Content-Type"] = []string{"application/json"}
+	res.WriteHeader(http.StatusOK)
+	_, err = res.Write(data)
+	if err != nil {
+		klog.Errorf("failed to write leader info http response: %v", err)
+	}
 }
 
 func main() {
@@ -181,6 +212,16 @@ func main() {
 		cancel()
 	}()
 
+	if addr != "" {
+		go func() {
+			http.HandleFunc("/", httpLeaderInfo)
+			err := http.ListenAndServe(addr, nil)
+			if err != nil {
+				log.Fatalf("failed to start http info endpoint: %v", err)
+			}
+		}()
+	}
+
 	// Start the leader election.
 	leaderelection.RunOrDie(ctx, leaderelection.LeaderElectionConfig{
 		Lock:            lock,
@@ -197,6 +238,8 @@ func main() {
 				klog.Infof("%s: stepping down as leader", id)
 			},
 			OnNewLeader: func(identity string) {
+				leaderInfo = identity
+
 				if identity == id {
 					// This participant was elected.
 					return
