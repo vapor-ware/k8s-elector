@@ -2,13 +2,13 @@
 # k8s-elector
 #
 
-BIN_NAME := elector
+BIN_NAME    := elector
 BIN_VERSION := 0.0.1
-IMAGE_NAME := vaporio/k8s-elector
+IMAGE_NAME  := vaporio/k8s-elector
 
 .PHONY: build
 build:  ## Build the executable binary
-	CGO_ENABLED=0 go build -a -installsuffix cgo -ldflags '-w' -o ${BIN_NAME}
+	CGO_ENABLED=0 go build -a -installsuffix cgo -ldflags '-w' -o ${BIN_NAME} cmd/elector.go
 
 .PHONY: clean
 clean:  ## Remove temporary files and build artifacts
