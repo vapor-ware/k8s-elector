@@ -18,6 +18,7 @@ package main
 
 import (
 	"flag"
+	"os"
 	"runtime"
 	"time"
 
@@ -49,6 +50,12 @@ var (
 	ttl        time.Duration
 )
 
+func init() {
+	// Set logging output to stdout to prevent the logger from crashing when
+	// attempting to create log files within the container.
+	klog.SetOutput(os.Stdout)
+}
+
 // logVersion is a helper function to log the build-time version information
 // for the elector.
 func logVersion() {
@@ -63,6 +70,8 @@ func logVersion() {
 }
 
 func main() {
+	klog.InitFlags(nil)
+
 	// Log elector version info before doing anything else.
 	logVersion()
 

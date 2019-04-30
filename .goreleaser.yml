@@ -1,0 +1,63 @@
+# For details, see the GoReleaser documentation at http://goreleaser.com
+project_name: k8s-elector
+before:
+  hooks:
+    - go clean -v
+    - rm -rf dist
+builds:
+  -
+    main: ./cmd/elector.go
+    binary: elector
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -w
+      - -X main.BuildDate={{ .Date }}
+      - -X main.Commit={{ .ShortCommit }}
+      - -X main.Tag={{ .Tag }}
+      - -X main.GoVersion={{ .Env.GOVERSION }}
+      - -X main.Version={{ .Version }}
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+archive:
+  format: tar.gz
+checksum:
+  name_template: 'checksums-{{ .Tag }}.txt'
+release:
+  github:
+    owner: vapor-ware
+    name: k8s-elector
+  draft: false
+  prerelease: auto
+  name_template: "{{ .Version }}"
+dockers:
+  -
+    goos: linux
+    goarch: amd64
+    skip_push: auto
+    binaries:
+      - elector
+    image_templates:
+      - vaporio/{{ .ProjectName }}:{{ .Tag }}
+      - vaporio/{{ .ProjectName }}:{{ .Major }}
+      - vaporio/{{ .ProjectName }}:{{ .Major }}.{{ .Minor }}
+      - vaporio/{{ .ProjectName }}:latest
+    build_flag_templates:
+      - "--label=org.label-schema.schema-version=1.0"
+      - "--label=org.label-schema.version={{ .Version }}"
+      - "--label=org.label-schema.build-date={{ .Date }}"
+      - "--label=org.label-schema.name=vaporio/{{ .ProjectName }}"
+      - "--label=org.label-schema.vcs-url=https://github.com/vapor-ware/{{ .ProjectName }}"
+      - "--label=org.label-schema.vcs-ref={{ .ShortCommit }}"
+      - "--label=org.label-schema.vendor=Vapor IO"
+snapshot:
+  name_template: "{{ .Tag }}-next"
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
