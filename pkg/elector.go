@@ -138,8 +138,8 @@ func (node *electorNode) run() error {
 		client.CoreV1(),
 		client.CoordinationV1(),
 		resourcelock.ResourceLockConfig{
-			Identity: node.config.ID,
-			// todo: create event recorder..
+			Identity:      node.config.ID,
+			EventRecorder: &lockRecorder{},
 		},
 	)
 	if err != nil {
