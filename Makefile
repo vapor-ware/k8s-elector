@@ -6,9 +6,21 @@ BIN_NAME    := elector
 BIN_VERSION := 0.0.1
 IMAGE_NAME  := vaporio/k8s-elector
 
+GIT_COMMIT  ?= $(shell git rev-parse --short HEAD 2> /dev/null || true)
+GIT_TAG     ?= $(shell git describe --tags 2> /dev/null || true)
+BUILD_DATE  := $(shell date -u +%Y-%m-%dT%T 2> /dev/null)
+GO_VERSION  := $(shell go version | awk '{ print $$3 }')
+
+LDFLAGS := -w \
+	-X main.BuildDate=${BUILD_DATE} \
+	-X main.Commit=${GIT_COMMIT} \
+	-X main.Tag=${GIT_TAG} \
+	-X main.GoVersion=${GO_VERSION} \
+	-X main.Version=${BIN_VERSION}
+
 .PHONY: build
 build:  ## Build the executable binary
-	CGO_ENABLED=0 go build -a -installsuffix cgo -ldflags '-w' -o ${BIN_NAME} cmd/elector.go
+	CGO_ENABLED=0 go build -a -installsuffix cgo -ldflags "${LDFLAGS}" -o ${BIN_NAME} cmd/elector.go
 
 .PHONY: clean
 clean:  ## Remove temporary files and build artifacts
