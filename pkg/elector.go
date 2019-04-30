@@ -36,6 +36,7 @@ import (
 	"k8s.io/klog"
 )
 
+// electorNode is a participant node in an election.
 type electorNode struct {
 	cancel        context.CancelFunc
 	config        *ElectorConfig
@@ -46,7 +47,7 @@ type electorNode struct {
 
 // NewElectorNode creates a new instance of an elector node which will
 // participate in an election.
-func NewElectorNode(config *ElectorConfig) (*electorNode, error) {
+func NewElectorNode(config *ElectorConfig) *electorNode {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -55,7 +56,7 @@ func NewElectorNode(config *ElectorConfig) (*electorNode, error) {
 		config: config,
 		ctx:    ctx,
 		quit:   make(chan os.Signal, 1),
-	}, nil
+	}
 }
 
 // Run the elector node.
@@ -254,7 +255,7 @@ func (node *electorNode) httpLeaderInfo(res http.ResponseWriter, req *http.Reque
 	if err != nil {
 		res.WriteHeader(http.StatusInternalServerError)
 		if _, e := res.Write([]byte(err.Error())); e != nil {
-			klog.Error("failed writing http error response (%v): %v", err, e)
+			klog.Errorf("failed writing http error response (%v): %v", err, e)
 		}
 		return
 	}

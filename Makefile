@@ -26,7 +26,11 @@ build:  ## Build the executable binary
 clean:  ## Remove temporary files and build artifacts
 	go clean -v
 	rm -rf dist
-	rm -f ${BIN_NAME}
+	rm -f ${BIN_NAME} coverage.out
+
+.PHONY: cover
+cover: test  ## Run unit tests and open the coverage report
+	go tool cover -html=coverage.out
 
 .PHONY: docker
 docker:  ## Build the docker image
@@ -41,6 +45,11 @@ fmt:  ## Run goimports on all go files
 github-tag:  ## Create and push a tag with the current version
 	git tag -a ${BIN_VERSION} -m "k8s-elector v${BIN_VERSION}"
 	git push -u origin ${BIN_VERSION}
+
+.PHONY: test
+test:  ## Run unit tests
+	@ # Note: this requires go1.10+ in order to do multi-package coverage reports
+	go test -race -coverprofile=coverage.out -covermode=atomic ./pkg/...
 
 .PHONY: version
 version:  ## Print the version
