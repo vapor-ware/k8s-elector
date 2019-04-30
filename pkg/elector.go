@@ -154,7 +154,6 @@ func (node *electorNode) run() error {
 		LeaseDuration:   node.config.TTL,
 		RenewDeadline:   node.config.TTL / 3,
 		RetryPeriod:     node.config.TTL / 6,
-		// TODO: watchdog
 		Callbacks: leaderelection.LeaderCallbacks{
 			OnStartedLeading: func(i context.Context) {
 				klog.Info("started leading")
