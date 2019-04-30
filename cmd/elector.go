@@ -76,7 +76,7 @@ func main() {
 	flag.DurationVar(&ttl, "ttl", 10*time.Second, "The TTL for the election.")
 	flag.Parse()
 
-	elector, err := pkg.NewElectorNode(&pkg.ElectorConfig{
+	elector := pkg.NewElectorNode(&pkg.ElectorConfig{
 		Address:    address,
 		ID:         id,
 		KubeConfig: kubeconfig,
@@ -85,11 +85,8 @@ func main() {
 		Name:       name,
 		TTL:        ttl,
 	})
-	if err != nil {
-		klog.Fatal("unable to create new elector node: %v", err)
-	}
 
 	if err := elector.Run(); err != nil {
-		klog.Fatal("error running elector: %v", err)
+		klog.Fatalf("error running elector: %v", err)
 	}
 }
