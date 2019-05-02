@@ -18,6 +18,7 @@ package pkg
 
 import "time"
 
+// ElectorConfig contains the configuration values for the elector node.
 type ElectorConfig struct {
 	// Address is the HTTP address[:port] that the elector will host an endpoint
 	// on (at '/') to provide information on the node and if it is the leader. If
