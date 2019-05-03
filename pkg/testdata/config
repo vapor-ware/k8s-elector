@@ -1,0 +1,13 @@
+apiVersion: v1
+clusters:
+- cluster:
+    insecure-skip-tls-verify: true
+    server: https://localhost:6443
+  name: test-cluster
+contexts:
+- context:
+    cluster: test-cluster
+  name: test
+current-context: test
+kind: Config
+preferences: {}

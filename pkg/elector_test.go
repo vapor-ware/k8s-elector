@@ -1,12 +1,16 @@
 package pkg
 
 import (
+	"bytes"
+	"encoding/json"
+	"net/http/httptest"
 	"os"
 	"syscall"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"k8s.io/klog"
 )
 
 func TestNewElectorNode(t *testing.T) {
@@ -40,6 +44,15 @@ func TestNewElectorNode(t *testing.T) {
 		assert.NotNil(t, node.ctx, c.description)
 		assert.NotNil(t, node.quit, c.description)
 	}
+}
+
+func TestElectorNode_Run_badConfig(t *testing.T) {
+	node := NewElectorNode(&ElectorConfig{})
+	assert.Nil(t, node.ctx.Err())
+
+	err := node.Run()
+	assert.Error(t, err)
+	assert.Error(t, node.ctx.Err())
 }
 
 func TestElectorNode_IsLeader(t *testing.T) {
@@ -210,4 +223,111 @@ func TestElectorNode_buildClientConfig_error(t *testing.T) {
 		assert.Nil(t, cfg, c.description)
 		assert.Error(t, err, c.description)
 	}
+}
+
+func TestElectorNode_buildClientConfig_ok(t *testing.T) {
+	node := electorNode{
+		config: &ElectorConfig{
+			KubeConfig: "./testdata/config",
+		},
+	}
+
+	cfg, err := node.buildClientConfig()
+	assert.NoError(t, err)
+	assert.NotNil(t, cfg)
+}
+
+func TestElectorNode_serveHTTP_noAddress(t *testing.T) {
+	node := electorNode{
+		config: &ElectorConfig{
+			Address: "",
+		},
+	}
+
+	var buf bytes.Buffer
+	klog.SetOutput(&buf)
+
+	node.serveHTTP()
+	assert.False(t, node.servingHTTP)
+	assert.Contains(t, buf.String(), "no address given")
+}
+
+func TestElectorNode_httpHandler_noLeader(t *testing.T) {
+	node := NewElectorNode(&ElectorConfig{
+		ID: "test-node-1",
+	})
+
+	req := httptest.NewRequest("GET", "localhost:3333/", nil)
+	w := httptest.NewRecorder()
+
+	node.httpLeaderInfo(w, req)
+
+	resp := w.Result()
+
+	data := map[string]interface{}{}
+	d := json.NewDecoder(resp.Body)
+	err := d.Decode(&data)
+	assert.NoError(t, err)
+
+	assert.Equal(t, 200, resp.StatusCode)
+	assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
+
+	assert.NotNil(t, data["timestamp"])
+	assert.Equal(t, "test-node-1", data["node"])
+	assert.Equal(t, "", data["leader"])
+	assert.Equal(t, false, data["is_leader"])
+}
+
+func TestElectorNode_httpHandler_otherNodeIsLeader(t *testing.T) {
+	node := NewElectorNode(&ElectorConfig{
+		ID: "test-node-1",
+	})
+	node.currentLeader = "test-node-2"
+
+	req := httptest.NewRequest("GET", "localhost:3333/", nil)
+	w := httptest.NewRecorder()
+
+	node.httpLeaderInfo(w, req)
+
+	resp := w.Result()
+
+	data := map[string]interface{}{}
+	d := json.NewDecoder(resp.Body)
+	err := d.Decode(&data)
+	assert.NoError(t, err)
+
+	assert.Equal(t, 200, resp.StatusCode)
+	assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
+
+	assert.NotNil(t, data["timestamp"])
+	assert.Equal(t, "test-node-1", data["node"])
+	assert.Equal(t, "test-node-2", data["leader"])
+	assert.Equal(t, false, data["is_leader"])
+}
+
+func TestElectorNode_httpHandler_isLeader(t *testing.T) {
+	node := NewElectorNode(&ElectorConfig{
+		ID: "test-node-1",
+	})
+	node.currentLeader = "test-node-1"
+
+	req := httptest.NewRequest("GET", "localhost:3333/", nil)
+	w := httptest.NewRecorder()
+
+	node.httpLeaderInfo(w, req)
+
+	resp := w.Result()
+
+	data := map[string]interface{}{}
+	d := json.NewDecoder(resp.Body)
+	err := d.Decode(&data)
+	assert.NoError(t, err)
+
+	assert.Equal(t, 200, resp.StatusCode)
+	assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
+
+	assert.NotNil(t, data["timestamp"])
+	assert.Equal(t, "test-node-1", data["node"])
+	assert.Equal(t, "test-node-1", data["leader"])
+	assert.Equal(t, true, data["is_leader"])
 }
