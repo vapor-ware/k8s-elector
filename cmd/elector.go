@@ -72,9 +72,6 @@ func logVersion() {
 func main() {
 	klog.InitFlags(nil)
 
-	// Log elector version info before doing anything else.
-	logVersion()
-
 	// Bind the flags to variables.
 	flag.StringVar(&address, "http", "", "The HTTP address (host:port) which leader state will be reported on.")
 	flag.StringVar(&id, "id", "", "The ID of the election participant. If not set, the hostname, as reported by the kernel, is used.")
@@ -84,6 +81,9 @@ func main() {
 	flag.StringVar(&namespace, "namespace", "default", "The Kubernetes namespace to run the election in. If not set, elections will run in the default namespace.")
 	flag.DurationVar(&ttl, "ttl", 10*time.Second, "The TTL for the election.")
 	flag.Parse()
+
+	// Log elector version info before doing anything else.
+	logVersion()
 
 	elector := pkg.NewElectorNode(&pkg.ElectorConfig{
 		Address:    address,
