@@ -75,6 +75,8 @@ func (node *electorNode) Run() error {
 		return err
 	}
 
+	node.config.Log()
+
 	// Run the signal exiter and HTTP server in separate goroutines. The
 	// election logic will run in the foreground and block until it is
 	// cancelled.
@@ -159,10 +161,10 @@ func (node *electorNode) run() error {
 		RetryPeriod:     node.config.TTL / 6,
 		Callbacks: leaderelection.LeaderCallbacks{
 			OnStartedLeading: func(i context.Context) {
-				klog.Info("started leading")
+				klog.Infof("[%s] started leading", node.config.ID)
 			},
 			OnStoppedLeading: func() {
-				klog.Infof("stepping down as leader")
+				klog.Infof("[%s] stepping down as leader", node.config.ID)
 			},
 			OnNewLeader: func(identity string) {
 				node.currentLeader = identity

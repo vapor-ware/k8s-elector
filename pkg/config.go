@@ -16,7 +16,11 @@
 
 package pkg
 
-import "time"
+import (
+	"time"
+
+	"k8s.io/klog"
+)
 
 // ElectorConfig contains the configuration values for the elector node.
 type ElectorConfig struct {
@@ -58,4 +62,20 @@ type ElectorConfig struct {
 	// retry period (the duration that elector nodes should wait between retry
 	// actions).
 	TTL time.Duration
+}
+
+// Log logs the ElectorConfig values at INFO level.
+func (conf *ElectorConfig) Log() {
+	if conf == nil {
+		klog.Info("elector config: nil")
+	} else {
+		klog.Info("elector config")
+		klog.Infof("  ID:         %s", conf.ID)
+		klog.Infof("  Name:       %s", conf.Name)
+		klog.Infof("  Namespace:  %s", conf.Namespace)
+		klog.Infof("  Address:    %s", conf.Address)
+		klog.Infof("  LockType:   %s", conf.LockType)
+		klog.Infof("  KubeConfig: %s", conf.KubeConfig)
+		klog.Infof("  TTL:        %v", conf.TTL)
+	}
 }
