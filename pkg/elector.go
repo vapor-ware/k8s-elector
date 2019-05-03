@@ -43,6 +43,8 @@ type electorNode struct {
 	ctx           context.Context
 	currentLeader string
 	quit          chan os.Signal
+
+	servingHTTP bool
 }
 
 // NewElectorNode creates a new instance of an elector node which will
@@ -238,6 +240,7 @@ func (node *electorNode) serveHTTP() {
 
 	klog.Infof("starting HTTP server on %v", node.config.Address)
 	http.HandleFunc("/", node.httpLeaderInfo)
+	node.servingHTTP = true
 	err := http.ListenAndServe(node.config.Address, nil)
 	if err != nil {
 		klog.Fatalf("failed to start the HTTP server: %v", err)
