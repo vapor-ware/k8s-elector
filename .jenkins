@@ -5,7 +5,6 @@ pipeline {
   agent any
 
   environment {
-    PROJ_PATH = '/go/src/github.com/vapor-ware/k8s-elector'
     IMAGE_NAME = 'vaporio/k8s-elector'
     GOVERSION = '1.12'
   }
@@ -20,11 +19,10 @@ pipeline {
     stage('Test') {
       steps {
         script {
-          docker.image('vaporio/jenkins-agent-golang:latest').inside('-v $WORKSPACE:$PROJ_PATH') {
+          docker.image('vaporio/jenkins-agent-golang:latest').inside() {
             // All the deps to build this project are provided by the runtime container
             // Skip the configuration management and let the pipeline assets do that for you.
-            sh 'cd ${PROJ_PATH} && dep ensure'
-            sh 'cd ${PROJ_PATH} && CGO_ENABLED=0 go test -covermode=atomic ./pkg/...'
+            sh 'CGO_ENABLED=0 go test -covermode=atomic ./pkg/...'
           }
         }
       }
@@ -42,8 +40,8 @@ pipeline {
              Without it, docker in agent is mysteriously permission
              locked despite having a GID present in the container.
           */
-          docker.image('vaporio/jenkins-agent-golang:latest').inside('-v /var/run/docker.sock:/var/run/docker.sock -v /usr/bin/docker:/usr/bin/docker -v $WORKSPACE:$PROJ_PATH --group-add docker') {
-            sh 'cd ${PROJ_PATH} && goreleaser release --snapshot --skip-publish --rm-dist'
+          docker.image('vaporio/jenkins-agent-golang:latest').inside('-v /var/run/docker.sock:/var/run/docker.sock -v /usr/bin/docker:/usr/bin/docker --group-add docker') {
+            sh 'goreleaser release --snapshot --skip-publish --rm-dist'
           }
         }
       }
@@ -70,9 +68,9 @@ pipeline {
       }
       steps {
         script {
-          docker.image('vaporio/jenkins-agent-golang:latest').inside('-v /var/run/docker.sock:/var/run/docker.sock -v /usr/bin/docker:/usr/bin/docker -e GITHUB_TOKEN=$GITHUB_TOKEN -v $WORKSPACE:$PROJ_PATH --group-add docker') {
+          docker.image('vaporio/jenkins-agent-golang:latest').inside('-v /var/run/docker.sock:/var/run/docker.sock -v /usr/bin/docker:/usr/bin/docker -e GITHUB_TOKEN=$GITHUB_TOKEN --group-add docker') {
             withDockerRegistry(registry: [credentialsId: 'vio-docker-hub']) {
-              sh 'cd ${PROJ_PATH} && goreleaser release --rm-dist'
+              sh 'goreleaser release --rm-dist'
             }
           }
         }
