@@ -2,8 +2,6 @@
 project_name: k8s-elector
 before:
   hooks:
-    - go clean -v
-    - rm -rf dist
     - go mod download
 builds:
   -
