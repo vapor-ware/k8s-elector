@@ -14,7 +14,7 @@ builds:
       - -X main.BuildDate={{ .Date }}
       - -X main.Commit={{ .ShortCommit }}
       - -X main.Tag={{ .Tag }}
-      - -X main.GoVersion={{ .Env.GOVERSION }}
+      - -X main.GoVersion={{ .Env.GOLANG_VERSION }}
       - -X main.Version={{ .Version }}
     goos:
       - linux
