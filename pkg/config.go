@@ -34,6 +34,11 @@ type ElectorConfig struct {
 	// using the HOSTNAME as its ID.
 	ID string
 
+	// PodName is the name of the Pod which the elector is running in. This is
+	// found via the ELECTOR_POD_NAME environment variable. If not set, this defaults
+	// to the hostname.
+	PodName string
+
 	// KubeConfig is the path to the kubeconfig file to use for setting up the
 	// elector node's Kubernetes client. If no kubeconfig is specified, the node
 	// will default to using in-cluster configuration.
@@ -73,6 +78,7 @@ func (conf *ElectorConfig) Log() {
 		klog.Infof("  ID:         %s", conf.ID)
 		klog.Infof("  Name:       %s", conf.Name)
 		klog.Infof("  Namespace:  %s", conf.Namespace)
+		klog.Infof("  PodName:    %s", conf.PodName)
 		klog.Infof("  Address:    %s", conf.Address)
 		klog.Infof("  LockType:   %s", conf.LockType)
 		klog.Infof("  KubeConfig: %s", conf.KubeConfig)

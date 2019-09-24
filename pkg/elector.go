@@ -27,6 +27,8 @@ import (
 	"syscall"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -34,6 +36,24 @@ import (
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/transport"
 	"k8s.io/klog"
+)
+
+const (
+	// EnvPodName is the environment variable which is checked for the Pod name.
+	EnvPodName = "ELECTOR_POD_NAME"
+
+	// ResourcePathPodLabel is the path to the Pod label metadata which is used
+	// for updating Pod label values for election status.
+	//
+	// Note that the label key is the last element in the path. Since the key
+	// contains a "/", it is escaped as "~1".
+	ResourcePathPodLabel = "/metadata/labels/k8s-elector~1status"
+
+	// StatusStandby is the standby status annotation value.
+	StatusStandby = "standby"
+
+	// StatusLeader is the leader status annotation value.
+	StatusLeader = "leader"
 )
 
 // electorNode is a participant node in an election.
@@ -162,9 +182,19 @@ func (node *electorNode) run() error {
 		Callbacks: leaderelection.LeaderCallbacks{
 			OnStartedLeading: func(i context.Context) {
 				klog.Infof("[%s] started leading", node.config.ID)
+
+				// Add/update Pod label marking this instance as the leader.
+				if err := updatePodLabel(node.config, client, StatusLeader); err != nil {
+					klog.Errorf("failed to set leader annotation: %v", err)
+				}
 			},
 			OnStoppedLeading: func() {
 				klog.Infof("[%s] stepping down as leader", node.config.ID)
+
+				// Add/update Pod label marking this instance as not the leader.
+				if err := updatePodLabel(node.config, client, StatusStandby); err != nil {
+					klog.Errorf("failed to set standby annotation: %v", err)
+				}
 			},
 			OnNewLeader: func(identity string) {
 				node.currentLeader = identity
@@ -175,11 +205,60 @@ func (node *electorNode) run() error {
 					return
 				}
 				klog.Infof("new leader elected: %s", identity)
+
+				// Add/update Pod label marking this instance as a standby node.
+				if err := updatePodLabel(node.config, client, StatusStandby); err != nil {
+					klog.Errorf("failed to set standby annotation: %v", err)
+				}
 			},
 		},
 	})
 
 	return nil
+}
+
+// patchLabel specifies a patch operation for a label string.
+type patchLabel struct {
+	Op    string `json:"op"`
+	Path  string `json:"path"`
+	Value string `json:"value"`
+}
+
+// updatePodLabel updates the label for the k8s-elector Pod to designate its
+// leadership status.
+//
+// If the elector instance becomes the leader, a value of "leader" is set. Otherwise, a
+// value of "standby" is set.
+func updatePodLabel(cfg *ElectorConfig, clientset *kubernetes.Clientset, value string) error {
+
+	// First, get the Pod. We want to first check whether or not the Pod has the
+	// label key or not. If not, add it; if so, update it.
+	pod, err := clientset.CoreV1().Pods(cfg.Namespace).Get(cfg.PodName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	// Determine the operation by whether or not the label key exists.
+	var operation string
+	if _, ok := pod.Labels[ResourcePathPodLabel]; ok {
+		operation = "replace"
+	} else {
+		operation = "add"
+	}
+
+	// Patch the Pod label.
+	payload := []patchLabel{{
+		Op:    operation,
+		Path:  ResourcePathPodLabel,
+		Value: value,
+	}}
+	payloadBytes, _ := json.Marshal(payload)
+	_, err = clientset.CoreV1().Pods(cfg.Namespace).Patch(
+		cfg.PodName,
+		types.JSONPatchType,
+		payloadBytes,
+	)
+	return err
 }
 
 // checkConfig checks that the elector node's configuration is valid.
@@ -200,13 +279,24 @@ func (node *electorNode) checkConfig() error {
 		)
 	}
 
+	hostname, err := os.Hostname()
+	if err != nil {
+		return err
+	}
+
+	// Get the name of the Pod. This is used to assign the leadership status
+	// annotation. If the Pod name is not set via Env, it will default to the
+	// hostname.
+	if val := os.Getenv(EnvPodName); val != "" {
+		node.config.PodName = val
+	} else {
+		klog.Infof("pod name not specified, using hostname: %s", hostname)
+		node.config.PodName = hostname
+	}
+
 	// If the elector node was not provided with an ID, use the machine's
 	// hostname as the default ID value.
 	if node.config.ID == "" {
-		hostname, err := os.Hostname()
-		if err != nil {
-			return err
-		}
 		klog.Infof("no ID specified for elector node, using hostname: %s", hostname)
 		node.config.ID = hostname
 	}
