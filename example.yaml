@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: k8s-elector-example
+  labels:
+    app: k8s-elector
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: k8s-elector
+  template:
+    metadata:
+      name: k8s-elector-example
+      labels:
+        app: k8s-elector
+    spec:
+      terminationGracePeriodSeconds: 3
+      containers:
+        - name: k8s-elector
+          image: vaporio/k8s-elector:latest
+          imagePullPolicy: Never
+          args:
+            - -election=example-election
+            - -http=localhost:4040
+            - -ttl=3s
+            - -namespace=default
+            - -lock-type=configmaps
