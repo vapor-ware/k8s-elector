@@ -103,7 +103,7 @@ func (node *electorNode) Run() error {
 	go node.listenForSignal()
 	go node.serveHTTP()
 
-	if err := node.run(); err != nil {
+	if err := node.runUntilError(); err != nil {
 		return err
 	}
 
@@ -139,6 +139,27 @@ func (node *electorNode) buildClientConfig() (*rest.Config, error) {
 		return nil, err
 	}
 	return cfg, err
+}
+
+// runUntilError runs the elector node and will keep re-running it until an error
+// is returned or the context is cancelled.
+func (node *electorNode) runUntilError() error {
+	for {
+		errChan := make(chan error, 1)
+		go func() {
+			errChan <- node.run()
+		}()
+
+		select {
+		case <-node.ctx.Done():
+			return node.ctx.Err()
+		case err := <-errChan:
+			if err != nil {
+				return err
+			}
+		}
+		klog.Info("re-running election")
+	}
 }
 
 // run the election.
