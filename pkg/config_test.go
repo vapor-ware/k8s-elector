@@ -2,12 +2,20 @@ package pkg
 
 import (
 	"bytes"
+	"flag"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"k8s.io/klog"
 )
+
+func init() {
+	flagset := flag.FlagSet{}
+	klog.InitFlags(&flagset)
+	flagset.Set("logtostderr", "false")
+	flagset.Set("alsologtostderr", "false")
+}
 
 func TestElectorConfig_Log_nil(t *testing.T) {
 	var conf *ElectorConfig
