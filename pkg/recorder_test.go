@@ -19,6 +19,6 @@ func TestLockRecorder_Eventf(t *testing.T) {
 	assert.Contains(
 		t,
 		buf.String(),
-		"lock event [TestEvent] test reason: test message",
+		"lock event test reason (TestEvent): test message",
 	)
 }
