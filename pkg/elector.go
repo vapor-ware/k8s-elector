@@ -152,12 +152,17 @@ func (node *electorNode) runUntilError() error {
 
 		select {
 		case <-node.ctx.Done():
+			klog.Info("terminating: context cancelled")
 			return node.ctx.Err()
 		case err := <-errChan:
 			if err != nil {
+				klog.Infof("terminating: run error  (%v)", err)
 				return err
 			}
 		}
+		// Sleep a short period of time so the topology has a little
+		// bit of time to settle.
+		time.Sleep(1 * time.Second)
 		klog.Info("re-running election")
 	}
 }
@@ -362,6 +367,7 @@ func (node *electorNode) serveHTTP() {
 
 // httpLeaderInfo is the handler for the endpoint which provides leader info.
 func (node *electorNode) httpLeaderInfo(res http.ResponseWriter, req *http.Request) {
+	klog.Infof("received incoming http request: %s %s (%s)", req.Method, req.URL, req.RemoteAddr)
 	data, err := json.Marshal(map[string]interface{}{
 		"node":      node.config.ID,
 		"leader":    node.currentLeader,

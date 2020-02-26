@@ -10,5 +10,5 @@ import (
 type lockRecorder struct{}
 
 func (recorder *lockRecorder) Eventf(obj runtime.Object, eventType, reason, message string, args ...interface{}) {
-	klog.Infof("lock event [%s] %s: %s", eventType, reason, message)
+	klog.Infof("lock event %s (%s): %s", reason, eventType, message)
 }
