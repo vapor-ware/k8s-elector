@@ -60,3 +60,4 @@ changelog:
     exclude:
       - '^docs:'
       - '^test:'
+      - '^bump:'
