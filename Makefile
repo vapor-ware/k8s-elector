@@ -3,7 +3,7 @@
 #
 
 BIN_NAME    := elector
-BIN_VERSION := 1.1.1
+BIN_VERSION := 1.2.0
 IMAGE_NAME  := vaporio/k8s-elector
 
 GIT_COMMIT  ?= $(shell git rev-parse --short HEAD 2> /dev/null || true)
