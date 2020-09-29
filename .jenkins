@@ -1,70 +1,14 @@
 #!/usr/bin/env groovy
 
-pipeline {
+// Include this shared CI repository to load script helpers and libraries.
+library identifier: 'vapor@1.0.0-RC13', retriever: modernSCM([
+  $class: 'GitSCMSource',
+  remote: 'https://github.com/vapor-ware/ci-shared.git',
+  credentialsId: 'vio-bot-gh',
+])
 
-  agent {
-    label 'golang-alpha'
-  }
 
-  environment {
-    IMAGE_NAME = 'vaporio/k8s-elector'
-  }
-
-  stages {
-    stage('Checkout') {
-      steps {
-        checkout scm
-      }
-    }
-
-    stage('Test') {
-      environment {
-        CGO_ENABLED = 0
-      }
-      steps {
-        container('golang') {
-          sh 'go test -covermode=atomic ./pkg/...'
-        }
-      }
-    }
-
-    stage('Snapshot Build') {
-      steps {
-        container('golang') {
-          sh 'rm -rf dist'
-          sh 'goreleaser release --debug --snapshot --skip-publish --rm-dist'
-        }
-      }
-    }
-
-    stage('Publish Latest') {
-      when {
-        branch 'master'
-      }
-      steps {
-        container('golang') {
-          withDockerRegistry(registry: [credentialsId: 'vio-docker-hub']) {
-            sh 'docker push ${IMAGE_NAME}:latest'
-          }
-        }
-      }
-    }
-
-    stage('Tagged Release') {
-      when {
-        buildingTag()
-      }
-      environment {
-        GITHUB_TOKEN = credentials('vio-bot-gh-token')
-      }
-      steps {
-        container('golang') {
-          sh 'rm -rf dist'
-          withDockerRegistry(registry: [credentialsId: 'vio-docker-hub']) {
-            sh 'goreleaser release --debug --rm-dist'
-          }
-        }
-      }
-    }
-  }
-}
+golangPipeline([
+  'image': 'vaporio/k8s-elector',
+  'skipIntegrationTest': true,
+])
