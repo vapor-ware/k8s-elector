@@ -56,8 +56,8 @@ const (
 	StatusLeader = "leader"
 )
 
-// electorNode is a participant node in an election.
-type electorNode struct {
+// ElectorNode is a participant node in an election.
+type ElectorNode struct {
 	cancel        context.CancelFunc
 	config        *ElectorConfig
 	ctx           context.Context
@@ -69,11 +69,11 @@ type electorNode struct {
 
 // NewElectorNode creates a new instance of an elector node which will
 // participate in an election.
-func NewElectorNode(config *ElectorConfig) *electorNode {
+func NewElectorNode(config *ElectorConfig) *ElectorNode {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	return &electorNode{
+	return &ElectorNode{
 		cancel: cancel,
 		config: config,
 		ctx:    ctx,
@@ -85,7 +85,7 @@ func NewElectorNode(config *ElectorConfig) *electorNode {
 //
 // This is the entry point that kicks off all of the elector node setup
 // and run logic.
-func (node *electorNode) Run() error {
+func (node *ElectorNode) Run() error {
 	// If anything goes wrong, cancel the elector nodes context. This ensures
 	// that it will clean up properly and release the lock in a timely manner.
 	defer node.cancel()
@@ -112,7 +112,7 @@ func (node *electorNode) Run() error {
 }
 
 // IsLeader checks whether the elector node is currently the leader.
-func (node *electorNode) IsLeader() bool {
+func (node *ElectorNode) IsLeader() bool {
 	if node.config == nil {
 		return false
 	}
@@ -120,7 +120,7 @@ func (node *electorNode) IsLeader() bool {
 }
 
 // buildConfig builds the config for the Kubernetes client used by the elector node.
-func (node *electorNode) buildClientConfig() (*rest.Config, error) {
+func (node *ElectorNode) buildClientConfig() (*rest.Config, error) {
 	if node.config == nil {
 		return nil, errors.New("no config specified for the elector")
 	}
@@ -143,7 +143,7 @@ func (node *electorNode) buildClientConfig() (*rest.Config, error) {
 
 // runUntilError runs the elector node and will keep re-running it until an error
 // is returned or the context is cancelled.
-func (node *electorNode) runUntilError() error {
+func (node *ElectorNode) runUntilError() error {
 	for {
 		errChan := make(chan error, 1)
 		go func() {
@@ -168,7 +168,7 @@ func (node *electorNode) runUntilError() error {
 }
 
 // run the election.
-func (node *electorNode) run() error {
+func (node *ElectorNode) run() error {
 	config, err := node.buildClientConfig()
 	if err != nil {
 		return err
@@ -292,7 +292,7 @@ func updatePodLabel(cfg *ElectorConfig, clientset *kubernetes.Clientset, value s
 // If required configuration fields are missing, this will return an error.
 // This function also sets default values for fields which can can have a
 // reasonable default to fall back to.
-func (node *electorNode) checkConfig() error {
+func (node *ElectorNode) checkConfig() error {
 	if node.config == nil {
 		return errors.New("no config specified for elector")
 	}
@@ -335,7 +335,7 @@ func (node *electorNode) checkConfig() error {
 //
 // The signals that are listened for are: SIGINT, SIGKILL, SIGTERM. Any of these
 // will cause the node to terminate gracefully.
-func (node *electorNode) listenForSignal() {
+func (node *ElectorNode) listenForSignal() {
 	signal.Notify(node.quit, os.Interrupt, os.Kill, syscall.SIGTERM)
 
 	klog.Info("listening for shutdown signals...")
@@ -350,7 +350,7 @@ func (node *electorNode) listenForSignal() {
 //
 // If the elector is not configured with an address (via the -http flag), the
 // HTTP server will not be started.
-func (node *electorNode) serveHTTP() {
+func (node *ElectorNode) serveHTTP() {
 	if node.config.Address == "" {
 		klog.Info("http server will not be started: no address given")
 		return
@@ -366,7 +366,7 @@ func (node *electorNode) serveHTTP() {
 }
 
 // httpLeaderInfo is the handler for the endpoint which provides leader info.
-func (node *electorNode) httpLeaderInfo(res http.ResponseWriter, req *http.Request) {
+func (node *ElectorNode) httpLeaderInfo(res http.ResponseWriter, req *http.Request) {
 	klog.Infof("received incoming http request: %s %s (%s)", req.Method, req.URL, req.RemoteAddr)
 	data, err := json.Marshal(map[string]interface{}{
 		"node":      node.config.ID,

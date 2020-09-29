@@ -83,7 +83,7 @@ func TestElectorNode_IsLeader(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		node := electorNode{
+		node := ElectorNode{
 			config:        c.config,
 			currentLeader: "test-2",
 		}
@@ -109,7 +109,7 @@ func TestElectorNode_checkConfig_error(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		node := electorNode{
+		node := ElectorNode{
 			config: c.config,
 		}
 
@@ -145,7 +145,7 @@ func TestElectorNode_checkConfig_ok(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		node := electorNode{
+		node := ElectorNode{
 			config: c.config,
 		}
 
@@ -217,7 +217,7 @@ func TestElectorNode_listenForSignal(t *testing.T) {
 //	}
 //
 //	for _, c := range cases {
-//		node := electorNode{
+//		node := ElectorNode{
 //			config: c.config,
 //		}
 //
@@ -228,7 +228,7 @@ func TestElectorNode_listenForSignal(t *testing.T) {
 //}
 
 func TestElectorNode_buildClientConfig_ok(t *testing.T) {
-	node := electorNode{
+	node := ElectorNode{
 		config: &ElectorConfig{
 			KubeConfig: "./testdata/config",
 		},
@@ -240,7 +240,7 @@ func TestElectorNode_buildClientConfig_ok(t *testing.T) {
 }
 
 func TestElectorNode_serveHTTP_noAddress(t *testing.T) {
-	node := electorNode{
+	node := ElectorNode{
 		config: &ElectorConfig{
 			Address: "",
 		},

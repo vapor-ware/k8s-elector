@@ -50,6 +50,10 @@ github-tag:  ## Create and push a tag with the current version
 	git tag -a ${BIN_VERSION} -m "k8s-elector v${BIN_VERSION}"
 	git push -u origin ${BIN_VERSION}
 
+.PHONY: lint
+lint:  ## Lint project source files
+	golint -set_exit_status ./pkg/...
+
 .PHONY: test
 test:  ## Run unit tests
 	@ # Note: this requires go1.10+ in order to do multi-package coverage reports
