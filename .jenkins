@@ -9,6 +9,8 @@ library identifier: 'vapor@1.19.7', retriever: modernSCM([
 
 
 golangPipeline([
+  'goVersion': '1.16',
   'image': 'vaporio/k8s-elector',
+  'skipSetup': true,
   'skipIntegrationTest': true,
 ])
