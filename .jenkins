@@ -12,5 +12,6 @@ golangPipeline([
   'goVersion': '1.16',
   'image': 'vaporio/k8s-elector',
   'skipSetup': true,
+  'skipUnitTest': true,
   'skipIntegrationTest': true,
 ])
