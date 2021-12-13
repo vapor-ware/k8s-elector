@@ -40,10 +40,10 @@ dockers:
     binaries:
       - elector
     image_templates:
-      - vaporio/{{ .ProjectName }}:{{ .Tag }}
-      - vaporio/{{ .ProjectName }}:{{ .Major }}
-      - vaporio/{{ .ProjectName }}:{{ .Major }}.{{ .Minor }}
-      - vaporio/{{ .ProjectName }}:latest
+      - docker.io/vaporio/{{ .ProjectName }}:{{ .Tag }}
+      - docker.io/vaporio/{{ .ProjectName }}:{{ .Major }}
+      - docker.io/vaporio/{{ .ProjectName }}:{{ .Major }}.{{ .Minor }}
+      - docker.io/vaporio/{{ .ProjectName }}:latest
     build_flag_templates:
       - "--label=org.label-schema.schema-version=1.0"
       - "--label=org.label-schema.version={{ .Version }}"
