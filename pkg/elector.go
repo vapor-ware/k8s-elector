@@ -70,7 +70,6 @@ type ElectorNode struct {
 // NewElectorNode creates a new instance of an elector node which will
 // participate in an election.
 func NewElectorNode(config *ElectorConfig) *ElectorNode {
-
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return &ElectorNode{
@@ -210,7 +209,7 @@ func (node *ElectorNode) run() error {
 				klog.Infof("[%s] started leading", node.config.ID)
 
 				// Add/update Pod label marking this instance as the leader.
-				if err := updatePodLabel(node.config, client, StatusLeader); err != nil {
+				if err := updatePodLabel(node.ctx, node.config, client, StatusLeader); err != nil {
 					klog.Errorf("failed to set leader annotation: %v", err)
 				}
 			},
@@ -218,7 +217,7 @@ func (node *ElectorNode) run() error {
 				klog.Infof("[%s] stepping down as leader", node.config.ID)
 
 				// Add/update Pod label marking this instance as not the leader.
-				if err := updatePodLabel(node.config, client, StatusStandby); err != nil {
+				if err := updatePodLabel(node.ctx, node.config, client, StatusStandby); err != nil {
 					klog.Errorf("failed to set standby annotation: %v", err)
 				}
 			},
@@ -233,7 +232,7 @@ func (node *ElectorNode) run() error {
 				klog.Infof("new leader elected: %s", identity)
 
 				// Add/update Pod label marking this instance as a standby node.
-				if err := updatePodLabel(node.config, client, StatusStandby); err != nil {
+				if err := updatePodLabel(node.ctx, node.config, client, StatusStandby); err != nil {
 					klog.Errorf("failed to set standby annotation: %v", err)
 				}
 			},
@@ -255,11 +254,10 @@ type patchLabel struct {
 //
 // If the elector instance becomes the leader, a value of "leader" is set. Otherwise, a
 // value of "standby" is set.
-func updatePodLabel(cfg *ElectorConfig, clientset *kubernetes.Clientset, value string) error {
-
+func updatePodLabel(ctx context.Context, cfg *ElectorConfig, clientset *kubernetes.Clientset, value string) error {
 	// First, get the Pod. We want to first check whether or not the Pod has the
 	// label key or not. If not, add it; if so, update it.
-	pod, err := clientset.CoreV1().Pods(cfg.Namespace).Get(cfg.PodName, metav1.GetOptions{})
+	pod, err := clientset.CoreV1().Pods(cfg.Namespace).Get(ctx, cfg.PodName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -280,9 +278,11 @@ func updatePodLabel(cfg *ElectorConfig, clientset *kubernetes.Clientset, value s
 	}}
 	payloadBytes, _ := json.Marshal(payload)
 	_, err = clientset.CoreV1().Pods(cfg.Namespace).Patch(
+		ctx,
 		cfg.PodName,
 		types.JSONPatchType,
 		payloadBytes,
+		metav1.PatchOptions{},
 	)
 	return err
 }
